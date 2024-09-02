@@ -12,12 +12,8 @@ namespace Core.CrossCuttingConcerns.SeriLog.Logger;
 
 public class FileLogger : LoggerServiceBase
 {
-	private readonly IConfiguration _configuration;
-
 	public FileLogger(IConfiguration configuration)
 	{
-		_configuration = configuration;
-
 		var logConfiguration = configuration.GetSection("SeriLogConfigurations:FileLogConfiguration").Get<FileLogConfiguration>()
 			?? throw new Exception(SerilogMessages.NullOptionsMessage);
 
