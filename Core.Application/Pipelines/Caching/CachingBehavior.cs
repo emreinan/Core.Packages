@@ -59,6 +59,29 @@ public class CachingBehavior<TRequest,TResponse> : IPipelineBehavior<TRequest, T
 		await _cache.SetAsync(request.CacheKey,serilizedResponse, options, cancellationToken);
 		_logger.LogInformation($"Added to Cache {request.CacheKey}");
 
+		if(request.CacheGroupKey is not null)
+		{
+			await addCacheKeyToGroup(request, slidingExpiration, cancellationToken);
+		}
+
 		return response;
+	}
+
+	private async Task addCacheKeyToGroup(TRequest request, TimeSpan slidingExpiration, CancellationToken cancellationToken)
+	{
+		var cacheKey = request.CacheKey;
+		var cacheGroupKey = request.CacheGroupKey;
+		var cacheGroupKeyList = await _cache.GetAsync(cacheGroupKey!,cancellationToken);
+		var cacheGroupKeyListString = Encoding.Default.GetString(cacheGroupKeyList ?? Encoding.Default.GetBytes("[]"));
+		var cacheGroupKeyListDeserialized = JsonSerializer.Deserialize<HashSet<string>>(cacheGroupKeyListString);
+		if (cacheGroupKeyListDeserialized is null)
+		{
+			cacheGroupKeyListDeserialized = new HashSet<string>();
+		}
+		cacheGroupKeyListDeserialized.Add(cacheKey);
+		var cacheGroupKeyListSerialized = JsonSerializer.Serialize(cacheGroupKeyListDeserialized);
+		await _cache.SetAsync(cacheGroupKey, Encoding.Default.GetBytes(cacheGroupKeyListSerialized), new DistributedCacheEntryOptions { SlidingExpiration = slidingExpiration }, cancellationToken);
+		_logger.LogInformation($"Added to Cache Group {cacheGroupKey}");
+		return;
 	}
 }
