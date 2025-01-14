@@ -3,36 +3,25 @@ using Core.Persistence.Paging;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Query;
-using System;
 using System.Collections;
-using System.Collections.Generic;
-using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Core.Persistence.Repositories;
 
-public class EfBaseRepository<TEntity, TEntityId, TContext>
-	: IAsyncRepository<TEntity, TEntityId>
+public class EfBaseRepository<TEntity, TEntityId, TContext>(TContext context)
+    : IAsyncRepository<TEntity, TEntityId>
 	,IRepository<TEntity, TEntityId>
 	where TEntity : Entity<TEntityId>
 	where TContext : DbContext
 {
-	protected readonly TContext Context;
-
-	public EfBaseRepository(TContext context)
-	{
-		Context = context;
-	}
-	public IQueryable<TEntity> Query() => Context.Set<TEntity>();
+    public IQueryable<TEntity> Query() => context.Set<TEntity>();
 
 	public async Task<TEntity> AddAsync(TEntity entity)
 	{
 		entity.CreatedDate = DateTime.UtcNow;
-		await Context.AddAsync(entity);
-		await Context.SaveChangesAsync();
+		await context.AddAsync(entity);
+		await context.SaveChangesAsync();
 		return entity;
 	}
 
@@ -40,12 +29,46 @@ public class EfBaseRepository<TEntity, TEntityId, TContext>
 	{
 		foreach (TEntity entity in entities)
 			entity.CreatedDate = DateTime.UtcNow;
-		await Context.AddRangeAsync(entities);
-		await Context.SaveChangesAsync();
+		await context.AddRangeAsync(entities);
+		await context.SaveChangesAsync();
 		return entities;
 	}
 
-	public async Task<bool> AnyAsync(Expression<Func<TEntity, bool>>? predicate = null, bool withDeleted = false, bool enableTracking = true, CancellationToken cancellationToken = default)
+    public async Task<TEntity> UpdateAsync(TEntity entity)
+    {
+        entity.UpdatedDate = DateTime.UtcNow;
+        context.Update(entity);
+        await context.SaveChangesAsync();
+        return entity;
+    }
+
+    public async Task<ICollection<TEntity>> UpdateRangeAsync(ICollection<TEntity> entities)
+    {
+        foreach (TEntity entity in entities)
+            entity.UpdatedDate = DateTime.UtcNow;
+        context.UpdateRange(entities);
+        await context.SaveChangesAsync();
+        return entities;
+    }
+
+    public async Task<TEntity> DeleteAsync(TEntity entity, bool permanent = false)
+    {
+        await SetEntityAsDeletedAsync(entity, permanent);
+        await context.SaveChangesAsync();
+        return entity;
+    }
+
+    public async Task<ICollection<TEntity>> DeleteRangeAsync(ICollection<TEntity> entities, bool permanent = false)
+    {
+        await SetEntitiesAsDeletedAsync(entities, permanent);
+        await context.SaveChangesAsync();
+        return entities;
+    }
+
+    public async Task<bool> AnyAsync(Expression<Func<TEntity, bool>>? predicate = null,
+                                  bool withDeleted = false,
+                                  bool enableTracking = true,
+                                  CancellationToken cancellationToken = default)
 	{
 		IQueryable<TEntity> queryable = Query();
 		if (!enableTracking)
@@ -57,21 +80,11 @@ public class EfBaseRepository<TEntity, TEntityId, TContext>
 		return await queryable.AnyAsync(cancellationToken);
 	}
 
-	public async Task<TEntity> DeleteAsync(TEntity entity, bool permanent = false)
-	{
-		await SetEntityAsDeletedAsync(entity, permanent);
-		await Context.SaveChangesAsync();
-		return entity;
-	}
-
-	public async Task<ICollection<TEntity>> DeleteRangeAsync(ICollection<TEntity> entities, bool permanent = false)
-	{
-		await SetEntityAsDeletedAsync(entities, permanent);
-		await Context.SaveChangesAsync();
-		return entities;
-	}
-
-	public async Task<TEntity?> GetAsync(Expression<Func<TEntity, bool>> predicate, Func<IQueryable<TEntity>, IIncludableQueryable<TEntity, object>>? include = null, bool withDeleted = false, bool enableTracking = true, CancellationToken cancellationToken = default)
+	public async Task<TEntity?> GetAsync(Expression<Func<TEntity, bool>> predicate,
+                                      Func<IQueryable<TEntity>, IIncludableQueryable<TEntity, object>>? include = null,
+                                      bool withDeleted = false,
+                                      bool enableTracking = true,
+                                      CancellationToken cancellationToken = default)
 	{
 		IQueryable<TEntity> queryable = Query();
 		if (!enableTracking)
@@ -83,7 +96,14 @@ public class EfBaseRepository<TEntity, TEntityId, TContext>
 		return await queryable.FirstOrDefaultAsync(predicate, cancellationToken);
 	}
 
-	public async Task<Paginate<TEntity>> GetListAsync(Expression<Func<TEntity, bool>>? predicate = null, Func<IQueryable<TEntity>, IOrderedQueryable<TEntity>>? orderBy = null, Func<IQueryable<TEntity>, IIncludableQueryable<TEntity, object>>? include = null, int index = 0, int size = 10, bool withDeleted = false, bool enableTracking = true, CancellationToken cancellationToken = default)
+	public async Task<Paginate<TEntity>> GetListAsync(Expression<Func<TEntity, bool>>? predicate = null,
+                                                   Func<IQueryable<TEntity>, IOrderedQueryable<TEntity>>? orderBy = null,
+                                                   Func<IQueryable<TEntity>, IIncludableQueryable<TEntity, object>>? include = null,
+                                                   int index = 0,
+                                                   int size = 10,
+                                                   bool withDeleted = false,
+                                                   bool enableTracking = true,
+                                                   CancellationToken cancellationToken = default)
 	{
 		IQueryable<TEntity> queryable = Query();
 		if (!enableTracking)
@@ -99,7 +119,14 @@ public class EfBaseRepository<TEntity, TEntityId, TContext>
 		return await queryable.ToPaginateAsync(index, size, cancellationToken);
 	}
 
-	public async Task<Paginate<TEntity>> GetListByDynamicAsync(DynamicQuery dynamic, Expression<Func<TEntity, bool>>? predicate = null, Func<IQueryable<TEntity>, IIncludableQueryable<TEntity, object>>? include = null, int index = 0, int size = 10, bool withDeleted = false, bool enableTracking = true, CancellationToken cancellationToken = default)
+	public async Task<Paginate<TEntity>> GetListByDynamicAsync(DynamicQuery dynamic,
+                                                            Expression<Func<TEntity, bool>>? predicate = null,
+                                                            Func<IQueryable<TEntity>, IIncludableQueryable<TEntity, object>>? include = null,
+                                                            int index = 0,
+                                                            int size = 10,
+                                                            bool withDeleted = false,
+                                                            bool enableTracking = true,
+                                                            CancellationToken cancellationToken = default)
 	{
 		IQueryable<TEntity> queryable = Query().ToDynamic(dynamic);
 		if (!enableTracking)
@@ -113,63 +140,26 @@ public class EfBaseRepository<TEntity, TEntityId, TContext>
 		return await queryable.ToPaginateAsync(index, size, cancellationToken);
 	}
 
-
-	public async Task<TEntity> UpdateAsync(TEntity entity)
-	{
-		entity.UpdatedDate = DateTime.UtcNow;
-		Context.Update(entity);
-		await Context.SaveChangesAsync();
-		return entity;
-	}
-
-	public async Task<ICollection<TEntity>> UpdateRangeAsync(ICollection<TEntity> entities)
-	{
-		foreach (TEntity entity in entities)
-			entity.UpdatedDate = DateTime.UtcNow;
-		Context.UpdateRange(entities);
-		await Context.SaveChangesAsync();
-		return entities;
-	}
-
-
 	protected async Task SetEntityAsDeletedAsync(TEntity entity, bool permanent)
 	{
 		if (!permanent)
 		{
 			CheckHasEntityHaveOneToOneRelation(entity);
-			await setEntityAsSoftDeletedAsync(entity);
+			await SetEntityAsSoftDeletedAsync(entity);
 		}
 		else
 		{
-			Context.Remove(entity);
+			context.Remove(entity);
 		}
 	}
 
-	protected void CheckHasEntityHaveOneToOneRelation(TEntity entity)
-	{
-		bool hasEntityHaveOneToOneRelation =
-			Context
-				.Entry(entity)
-				.Metadata.GetForeignKeys()
-				.All(
-					x =>
-						x.DependentToPrincipal?.IsCollection == true
-						|| x.PrincipalToDependent?.IsCollection == true
-						|| x.DependentToPrincipal?.ForeignKey.DeclaringEntityType.ClrType == entity.GetType()
-				) == false;
-		if (hasEntityHaveOneToOneRelation)
-			throw new InvalidOperationException(
-				"Entity has one-to-one relationship. Soft Delete causes problems if you try to create entry again by same foreign key."
-			);
-	}
-
-	private async Task setEntityAsSoftDeletedAsync(IEntityTimestamps entity)
+	private async Task SetEntityAsSoftDeletedAsync(IEntityTimestamps entity)
 	{
 		if (entity.DeletedDate.HasValue)
 			return;
 		entity.DeletedDate = DateTime.UtcNow;
 
-		var navigations = Context
+		var navigations = context
 			.Entry(entity)
 			.Metadata.GetNavigations()
 			.Where(x => x is { IsOnDependent: false, ForeignKey.DeleteBehavior: DeleteBehavior.ClientCascade or DeleteBehavior.Cascade })
@@ -186,31 +176,31 @@ public class EfBaseRepository<TEntity, TEntityId, TContext>
 			{
 				if (navValue == null)
 				{
-					IQueryable query = Context.Entry(entity).Collection(navigation.PropertyInfo.Name).Query();
-					navValue = await GetRelationLoaderQuery(query, navigationPropertyType: navigation.PropertyInfo.GetType()).ToListAsync();
+					IQueryable query = context.Entry(entity).Collection(navigation.PropertyInfo.Name).Query();
+					navValue = GetRelationLoaderQuery(query, navigationPropertyType: navigation.PropertyInfo.GetType()).ToList();
 					if (navValue == null)
 						continue;
 				}
 
 				foreach (IEntityTimestamps navValueItem in (IEnumerable)navValue)
-					await setEntityAsSoftDeletedAsync(navValueItem);
+					await SetEntityAsSoftDeletedAsync(navValueItem);
 			}
 			else
 			{
 				if (navValue == null)
 				{
-					IQueryable query = Context.Entry(entity).Reference(navigation.PropertyInfo.Name).Query();
-					navValue = await GetRelationLoaderQuery(query, navigationPropertyType: navigation.PropertyInfo.GetType())
-						.FirstOrDefaultAsync();
+					IQueryable query = context.Entry(entity).Reference(navigation.PropertyInfo.Name).Query();
+					navValue = GetRelationLoaderQuery(query, navigationPropertyType: navigation.PropertyInfo.GetType())
+						.FirstOrDefault();
 					if (navValue == null)
 						continue;
 				}
 
-				await setEntityAsSoftDeletedAsync((IEntityTimestamps)navValue);
+				await SetEntityAsSoftDeletedAsync((IEntityTimestamps)navValue);
 			}
 		}
 
-		Context.Update(entity);
+		context.Update(entity);
 	}
 
 	protected IQueryable<object> GetRelationLoaderQuery(IQueryable query, Type navigationPropertyType)
@@ -227,13 +217,34 @@ public class EfBaseRepository<TEntity, TEntityId, TContext>
 		return queryProviderQuery.Where(x => !((IEntityTimestamps)x).DeletedDate.HasValue);
 	}
 
-	protected async Task SetEntityAsDeletedAsync(IEnumerable<TEntity> entities, bool permanent)
+	protected async Task SetEntitiesAsDeletedAsync(IEnumerable<TEntity> entities, bool permanent)
 	{
 		foreach (TEntity entity in entities)
 			await SetEntityAsDeletedAsync(entity, permanent);
 	}
 
-	public TEntity? Get(
+    protected void CheckHasEntityHaveOneToOneRelation(TEntity entity)
+    {
+        bool hasEntityHaveOneToOneRelation =
+            context
+                .Entry(entity)
+                .Metadata.GetForeignKeys()
+                .All(
+                    x =>
+                        x.DependentToPrincipal?.IsCollection == true
+                        || x.PrincipalToDependent?.IsCollection == true
+                        || x.DependentToPrincipal?.ForeignKey.DeclaringEntityType.ClrType == entity.GetType()
+                ) == false;
+        if (hasEntityHaveOneToOneRelation)
+            throw new InvalidOperationException(
+                "Entity has one-to-one relationship. Soft Delete causes problems if you try to create entry again by same foreign key."
+            );
+    }
+
+
+
+
+    public TEntity? Get(
 		Expression<Func<TEntity, bool>> predicate,
 		Func<IQueryable<TEntity>, IIncludableQueryable<TEntity, object>>? include = null,
 		bool withDeleted = false,
@@ -330,8 +341,8 @@ public class EfBaseRepository<TEntity, TEntityId, TContext>
 	public TEntity Add(TEntity entity)
 	{
 		entity.CreatedDate = DateTime.UtcNow;
-		Context.Add(entity);
-		Context.SaveChanges();
+		context.Add(entity);
+		context.SaveChanges();
 		return entity;
 	}
 
@@ -339,16 +350,16 @@ public class EfBaseRepository<TEntity, TEntityId, TContext>
 	{
 		foreach (TEntity entity in entities)
 			entity.CreatedDate = DateTime.UtcNow;
-		Context.AddRange(entities);
-		Context.SaveChanges();
+		context.AddRange(entities);
+		context.SaveChanges();
 		return entities;
 	}
 
 	public TEntity Update(TEntity entity)
 	{
 		entity.UpdatedDate = DateTime.UtcNow;
-		Context.Update(entity);
-		Context.SaveChanges();
+		context.Update(entity);
+		context.SaveChanges();
 		return entity;
 	}
 
@@ -356,22 +367,22 @@ public class EfBaseRepository<TEntity, TEntityId, TContext>
 	{
 		foreach (TEntity entity in entities)
 			entity.UpdatedDate = DateTime.UtcNow;
-		Context.UpdateRange(entities);
-		Context.SaveChanges();
+		context.UpdateRange(entities);
+		context.SaveChanges();
 		return entities;
 	}
 
 	public TEntity Delete(TEntity entity, bool permanent = false)
 	{
 		SetEntityAsDeleted(entity, permanent);
-		Context.SaveChanges();
+		context.SaveChanges();
 		return entity;
 	}
 
 	public ICollection<TEntity> DeleteRange(ICollection<TEntity> entities, bool permanent = false)
 	{
-		SetEntityAsDeleted(entities, permanent);
-		Context.SaveChanges();
+		SetEntitiesAsDeleted(entities, permanent);
+		context.SaveChanges();
 		return entities;
 	}
 	protected void SetEntityAsDeleted(TEntity entity, bool permanent)
@@ -379,27 +390,27 @@ public class EfBaseRepository<TEntity, TEntityId, TContext>
 		if (!permanent)
 		{
 			CheckHasEntityHaveOneToOneRelation(entity);
-			setEntityAsSoftDeleted(entity);
+			SetEntityAsSoftDeleted(entity);
 		}
 		else
 		{
-			Context.Remove(entity);
+			context.Remove(entity);
 		}
 	}
 
-	protected void SetEntityAsDeleted(IEnumerable<TEntity> entities, bool permanent)
+	protected void SetEntitiesAsDeleted(IEnumerable<TEntity> entities, bool permanent)
 	{
 		foreach (TEntity entity in entities)
 			SetEntityAsDeleted(entity, permanent);
 	}
 
-	private void setEntityAsSoftDeleted(IEntityTimestamps entity)
+	private void SetEntityAsSoftDeleted(IEntityTimestamps entity)
 	{
 		if (entity.DeletedDate.HasValue)
 			return;
 		entity.DeletedDate = DateTime.UtcNow;
 
-		var navigations = Context
+		var navigations = context
 			.Entry(entity)
 			.Metadata.GetNavigations()
 			.Where(x => x is { IsOnDependent: false, ForeignKey.DeleteBehavior: DeleteBehavior.ClientCascade or DeleteBehavior.Cascade })
@@ -416,30 +427,30 @@ public class EfBaseRepository<TEntity, TEntityId, TContext>
 			{
 				if (navValue == null)
 				{
-					IQueryable query = Context.Entry(entity).Collection(navigation.PropertyInfo.Name).Query();
+					IQueryable query = context.Entry(entity).Collection(navigation.PropertyInfo.Name).Query();
 					navValue = GetRelationLoaderQuery(query, navigationPropertyType: navigation.PropertyInfo.GetType()).ToList();
 					if (navValue == null)
 						continue;
 				}
 
 				foreach (IEntityTimestamps navValueItem in (IEnumerable)navValue)
-					setEntityAsSoftDeleted(navValueItem);
+					SetEntityAsSoftDeleted(navValueItem);
 			}
 			else
 			{
 				if (navValue == null)
 				{
-					IQueryable query = Context.Entry(entity).Reference(navigation.PropertyInfo.Name).Query();
+					IQueryable query = context.Entry(entity).Reference(navigation.PropertyInfo.Name).Query();
 					navValue = GetRelationLoaderQuery(query, navigationPropertyType: navigation.PropertyInfo.GetType()).FirstOrDefault();
 					if (navValue == null)
 						continue;
 				}
 
-				setEntityAsSoftDeleted((IEntityTimestamps)navValue);
+				SetEntityAsSoftDeleted((IEntityTimestamps)navValue);
 			}
 		}
 
-		Context.Update(entity);
+		context.Update(entity);
 	}
 }
 

@@ -2,11 +2,6 @@
 using Core.CrossCuttingConcerns.SeriLog.Messages;
 using Microsoft.Extensions.Configuration;
 using Serilog;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Core.CrossCuttingConcerns.SeriLog.Logger;
 

@@ -1,9 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Linq.Dynamic.Core;
+﻿using System.Linq.Dynamic.Core;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace Core.Persistence.Dynamic;
 
@@ -12,7 +8,7 @@ public static class IQueryableDynamicFilterExtensions
     private static readonly string[] _orders = { "asc", "desc" };
     private static readonly string[] _logics = { "and", "or" };
 
-    private static readonly IDictionary<string, string> _operators = new Dictionary<string, string>
+    private static readonly Dictionary<string, string> _operators = new()
     {
         { "eq", "=" },
         { "neq", "!=" },

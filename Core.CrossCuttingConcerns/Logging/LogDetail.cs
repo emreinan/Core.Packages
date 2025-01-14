@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace Core.CrossCuttingConcerns.Logging;
+﻿namespace Core.CrossCuttingConcerns.Logging;
 
 public class LogDetail
 {
@@ -18,7 +12,7 @@ public class LogDetail
 		FullName = string.Empty;
 		MethodName = string.Empty;
 		User = string.Empty;
-		LogParameters = new List<LogParameter>();
+		LogParameters = [];
 	}
 
 	public LogDetail(string fullName, string methodName, string user, List<LogParameter> logParameters)
